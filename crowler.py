@@ -9,17 +9,29 @@ from threading import Thread
 import pika
 import time
 
-
-@dataclass
-class Artist:
-    name: str
-    spotify_id: str
-    followers: int
-    popularity: int
-    genres: List[str]
+from common.artist import Artist
+from db.spotify_db import SpotifyDB
 
 
 class CrowlerWorker:
+    def __init__(self):
+        # Init RabbitMQ
+        connection = pika.BlockingConnection(
+            pika.ConnectionParameters(host='localhost'))
+        self.channel = connection.channel()
+
+        self.channel.queue_declare(queue='task_queue', durable=True)
+
+        self.channel.basic_consume(queue='task_queue', on_message_callback=self.handle_artist)
+
+        # Init Spotify api
+        client_credentials_manager = SpotifyClientCredentials()
+        self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
+
+        # Init database
+        self.db = SpotifyDB()
+
+
     def _get_related_artists(self, artist_id) -> List[Artist]:
         result = None
         try:
@@ -50,10 +62,7 @@ class CrowlerWorker:
         return None
 
     def _check_visited(self, artist_id):
-        if artist_id in self.visited:
-            return True
-
-        return False
+        return self.db.check_artist_exists(artist_id)
 
     def _push_artist(self, artist_id: str):
         self.channel.basic_publish(
@@ -71,30 +80,15 @@ class CrowlerWorker:
         if self._check_visited(artist_id):
             return
 
-        print("New artist. Already know", len(self.visited))
-        self.visited.add(artist_id)
+        artist = self._get_artist(artist_id)
+        self.db.add_artist(artist)
+
         for related in self._get_related_artists(artist_id):
             if self._check_visited(related.spotify_id):
                 continue
 
             self._push_artist(related.spotify_id)
         ch.basic_ack(delivery_tag=method.delivery_tag)
-
-    def __init__(self):
-        self.visited = set()
-
-        # Init RabbitMQ
-        connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host='localhost'))
-        self.channel = connection.channel()
-
-        self.channel.queue_declare(queue='task_queue', durable=True)
-
-        self.channel.basic_consume(queue='task_queue', on_message_callback=self.handle_artist)
-
-        # Init Spotify api
-        client_credentials_manager = SpotifyClientCredentials()
-        self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
 
     def start(self):
         self.channel.start_consuming()
