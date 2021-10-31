@@ -8,9 +8,39 @@ import logging
 from threading import Thread
 import pika
 import time
+import click
 
 from common.artist import Artist
 from db.spotify_db import SpotifyDB
+
+
+logging.basicConfig(level=logging.ERROR)
+
+
+class Performer:
+    def __init__(self, tag: str = ""):
+        self.start_time = time.time()
+        self.loop_time = self.start_time
+
+        self.tag = tag
+
+        logging.debug(f"Start measuring {tag}")
+
+    def restart(self):
+        self.start_time = time.time()
+        self.loop_time = self.start_time
+
+    def section(self, section_tag):
+        current_time = time.time()
+        logging.debug(
+            f"{self.tag}:{section_tag}: Section time: {current_time - self.loop_time}")
+
+        self.loop_time = current_time
+
+    def elapsed(self):
+        current_time = time.time()
+        logging.debug(
+            f"{self.tag}: Total time: {current_time - self.start_time}")
 
 
 class CrowlerWorker:
@@ -31,16 +61,17 @@ class CrowlerWorker:
         # Init database
         self.db = SpotifyDB()
 
-
     def _get_related_artists(self, artist_id) -> List[Artist]:
         result = None
         try:
+            req = Performer("get related requrest")
             result = self.spotify.artist_related_artists(f'spotify:artist:{artist_id}')
+            req.elapsed()
         except spotipy.exceptions.SpotifyException as e:
             logging.error(f"Can't get related artists: artist_id {artist_id}")
 
         if result:
-            artists = [self._get_artist(artist["id"]) for artist in result["artists"]]
+            artists = [self._parse_artist(artist) for artist in result["artists"]]
             return [artist for artist in artists if artist is not None]
 
         return []
@@ -53,13 +84,17 @@ class CrowlerWorker:
             logging.error(f"Can't get information about artist: artist_id {artist_id}")
 
         if result:
-            return Artist(name=result["name"],
-                           spotify_id=result["id"],
-                           followers=result["followers"]["total"],
-                           popularity=result["popularity"],
-                           genres=result["genres"])
+            return self._parse_artist(result)
 
         return None
+
+    @staticmethod
+    def _parse_artist(artist_result):
+        return Artist(name=artist_result["name"],
+                      spotify_id=artist_result["id"],
+                      followers=artist_result["followers"]["total"],
+                      popularity=artist_result["popularity"],
+                      genres=artist_result["genres"])
 
     def _check_visited(self, artist_id):
         return self.db.check_artist_exists(artist_id)
@@ -68,40 +103,46 @@ class CrowlerWorker:
         self.channel.basic_publish(
             exchange='',
             routing_key='task_queue',
-            body=artist_id,
+            body=str.encode(artist_id),
             properties=pika.BasicProperties(
                 delivery_mode=2,  # make message persistent
             ))
 
     def handle_artist(self, ch, method, properties, body):
         artist_id = body.decode("utf-8")
-        if artist_id == "From worker":
-            return
+
         if self._check_visited(artist_id):
             return
 
         artist = self._get_artist(artist_id)
+
         self.db.add_artist(artist)
 
-        for related in self._get_related_artists(artist_id):
+        related_artists = self._get_related_artists(artist_id)
+        related_ids = [related.spotify_id for related in related_artists]
+
+        self.db.add_relations(artist_id, related_ids)
+
+        for related in related_artists:
             if self._check_visited(related.spotify_id):
                 continue
 
             self._push_artist(related.spotify_id)
+
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     def start(self):
         self.channel.start_consuming()
 
 
-def send_test_message():
+def send_test_message(artist_id):
     connection = pika.BlockingConnection(
         pika.ConnectionParameters(host='localhost'))
     channel = connection.channel()
 
     channel.queue_declare(queue='task_queue', durable=True)
 
-    message = "3jOstUTkEu2JkjvRdBA5Gu"
+    message = artist_id
     channel.basic_publish(
         exchange='',
         routing_key='task_queue',
@@ -118,22 +159,15 @@ def start_listening():
     consumer.start()
 
 
-if __name__ == "__main__":
-    #o = SpotifyCrowler()
-    send_test_message()
-    for i in range(5):
+@click.command()
+@click.option('--num_workers', default=1, help='number of parallel workers')
+@click.option('--initial_artist_id', default="3jOstUTkEu2JkjvRdBA5Gu", help='artist spotify id to start search')
+def main(num_workers, initial_artist_id):
+    send_test_message(initial_artist_id)
+    for i in range(num_workers):
         new_thread = Thread(target=start_listening)
         new_thread.start()
 
-#    o._get_artist('3jOstUTkEu2JkjvRdBA5Gu')
-    #o.crowl('3jOstUTkEu2JkjvRdBA5Gu')
-    # try:
-    #     name = result['artists']['items'][0]['name']
-    #     uri = result['artists']['items'][0]['uri']
-    #
-    #     related = sp.artist_related_artists(uri)
-    #     print('Related artists for', name)
-    #     for artist in related['artists']:
-    #         print('  ', artist['name'])
-    # except BaseException:
-    #     print("usage show_related.py [artist-name]")
+
+if __name__ == "__main__":
+    main()
