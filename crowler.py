@@ -11,7 +11,7 @@ import time
 import click
 
 from common.artist import Artist
-from db.spotify_db import SpotifyDB
+from db.alchemy_spotify_db import ASpotifyDB as SpotifyDB
 
 
 logging.basicConfig(level=logging.ERROR)
