@@ -47,8 +47,9 @@ class AlchemyArtist(Base):
 
 class ASpotifyDB:
     def __init__(self):
-        engine = create_engine('sqlite:///C:/Development/spotigraph/data/spotify.sqlite')
+        engine = create_engine('postgresql://postgres:nkp47FRy@localhost:5432/postgres')
         Base.metadata.bind = engine
+        Base.metadata.create_all(engine)
         self.session = sessionmaker(bind=engine)()
 
     def add_artist(self, artist: Artist):
@@ -58,6 +59,11 @@ class ASpotifyDB:
                                        popularity=artist.popularity,
                                        followers=artist.followers)
             self.session.add(new_person)
+
+            for genre in artist.genres:
+                self.session.add(AlchemyArtistGenre(spotify_id=artist.spotify_id,
+                                                    genre=genre))
+
             self.session.commit()
         except sqlite3.IntegrityError as e:
             logging.warning("Attempt to insert artist that already exists in the DB")

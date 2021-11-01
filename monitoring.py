@@ -1,7 +1,7 @@
 import logging
 import time
 
-from db.spotify_db import SpotifyDB
+from db.alchemy_spotify_db import ASpotifyDB as SpotifyDB
 
 
 class Monitoring:
