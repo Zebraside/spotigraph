@@ -1,21 +1,20 @@
 import sqlite3
 import click
+import yaml
+from db.alchemy_spotify_db import ASpotifyDB as SpotifyDB
+
+from graph.artist_graph import InternalGraph
+from graph.visualization import visualize_graph
 
 
-@click.group()
-def cli():
-    pass
+if __name__ == '__main__':
+    config = None
+    with open("C:\\Dev\\spotigraph\\config.yaml", "r") as f:
+        config = yaml.safe_load(f)
+    db = SpotifyDB(config)
 
-@cli.command()
-def initdb():
-    click.echo('Initialized the database')
+    artists = db.get_artists()
+    connections = db.get_relations()
 
-@cli.command()
-def dropdb():
-    click.echo('Dropped the database')
-
-# # Press the green button in the gutter to run the script.
-# if __name__ == '__main__':
-#     cli()
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    graph = InternalGraph(artists, connections)
+    visualize_graph(graph, "C:\\Dev\\spotigraph\\test.dot")
