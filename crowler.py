@@ -9,10 +9,13 @@ from threading import Thread
 import pika
 import time
 import click
+import yaml
+import asyncio
 
 from common.artist import Artist
 from db.alchemy_spotify_db import ASpotifyDB as SpotifyDB
 
+from utils.profile import profile
 
 logging.basicConfig(level=logging.ERROR)
 
@@ -44,7 +47,7 @@ class Performer:
 
 
 class CrowlerWorker:
-    def __init__(self):
+    def __init__(self, config):
         # Init RabbitMQ
         connection = pika.BlockingConnection(
             pika.ConnectionParameters(host='localhost'))
@@ -59,7 +62,7 @@ class CrowlerWorker:
         self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
 
         # Init database
-        self.db = SpotifyDB()
+        self.db = SpotifyDB(config)
 
     def _get_related_artists(self, artist_id) -> List[Artist]:
         result = None
@@ -108,26 +111,44 @@ class CrowlerWorker:
                 delivery_mode=2,  # make message persistent
             ))
 
-    def handle_artist(self, ch, method, properties, body):
-        artist_id = body.decode("utf-8")
+    @profile
+    def get_artist_info(self, artist_id):
+        return self._get_artist(artist_id), self._get_related_artists(artist_id)
 
+    async def test(self):
+        print("Test")
+
+    @profile
+    def save_artist(self, artist, related_artists):
+        artist_id = artist.spotify_id
         if self._check_visited(artist_id):
-            return
-
-        artist = self._get_artist(artist_id)
+            return []
 
         self.db.add_artist(artist)
 
-        related_artists = self._get_related_artists(artist_id)
         related_ids = [related.spotify_id for related in related_artists]
 
         self.db.add_relations(artist_id, related_ids)
 
+        new = []
         for related in related_artists:
             if self._check_visited(related.spotify_id):
                 continue
 
-            self._push_artist(related.spotify_id)
+            new.append(related.spotify_id)
+        return new
+
+    @profile
+    def push_new(self, new):
+        for n in new:
+            self._push_artist(n)
+
+    def handle_artist(self, ch, method, properties, body):
+        print("handle")
+        artist_id = body.decode("utf-8")
+        artist, related_artists = self.get_artist_info(artist_id)
+        new = self.save_artist(artist, related_artists)
+        self.push_new(new)
 
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
@@ -154,8 +175,9 @@ def send_test_message(artist_id):
     connection.close()
 
 
-def start_listening():
-    consumer = CrowlerWorker()
+def start_listening(config):
+
+    consumer = CrowlerWorker(config)
     consumer.start()
 
 
@@ -164,8 +186,12 @@ def start_listening():
 @click.option('--initial_artist_id', default="3jOstUTkEu2JkjvRdBA5Gu", help='artist spotify id to start search')
 def main(num_workers, initial_artist_id):
     send_test_message(initial_artist_id)
+    config = dict()
+    with open("C:\\Dev\\spotigraph\\config.yaml", "r") as f:
+        config = yaml.safe_load(f)
+
     for i in range(num_workers):
-        new_thread = Thread(target=start_listening)
+        new_thread = Thread(target=start_listening, args=(config, ))
         new_thread.start()
 
 

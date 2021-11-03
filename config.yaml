@@ -1,0 +1,10 @@
+db:
+  POSTGRES_NAME: postgres
+  POSTGRES_PASS: nkp47FRy
+  POSTGRES_SERVER: localhost
+  POSTGRES_PORT: 5432
+  POSTGRES_DB: postgres
+
+message_queue:
+  URL_QUEUE: url_queue
+  DATA_QUEUE: data_queue

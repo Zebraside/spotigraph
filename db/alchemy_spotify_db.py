@@ -1,8 +1,7 @@
 import os
 import sys
-from sqlalchemy import Column, ForeignKey, Integer, String
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from db.schema import AlchemyArtistGenre, AlchemyArtist, AlchemyConnections, Base
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError, PendingRollbackError
@@ -16,38 +15,27 @@ from utils.profile import profile
 from common.artist import Artist
 
 
-Base = declarative_base()
-
-
-class AlchemyArtistGenre(Base):
-    __tablename__ = "artist_genre"
-
-    id = Column(Integer, primary_key=True, nullable=False, unique=True, autoincrement=True)
-    spotify_id = Column(String(250), nullable=False)
-    genre = Column(String(250), nullable=False)
-
-
-class AlchemyConnections(Base):
-    __tablename__ = "connections"
-
-    id = Column(Integer, primary_key=True, nullable=False, unique=True, autoincrement=True)
-    artist_id = Column(String(250), nullable=False)
-    related_id = Column(String(250), nullable=False)
-
-
-class AlchemyArtist(Base):
-    __tablename__ = 'artists'
-
-    id = Column(Integer, primary_key=True, nullable=False, unique=True, autoincrement=True)
-    name = Column(String(250), nullable=False)
-    spotify_id = Column(String(250), nullable=False)
-    popularity = Column(Integer(), nullable=False)
-    followers = Column(Integer(), nullable=False)
-
-
 class ASpotifyDB:
-    def __init__(self):
-        engine = create_engine('postgresql://postgres:nkp47FRy@localhost:5432/postgres')
+    @staticmethod
+    def _check_config(config):
+        config = config["db"]
+        if "POSTGRES_NAME" not in config or \
+           "POSTGRES_PASS" not in config or \
+           "POSTGRES_SERVER" not in config or \
+           "POSTGRES_PORT" not in config or \
+           "POSTGRES_DB" not in config:
+            return False
+        return True
+
+    def __init__(self, config):
+        if not self._check_config(config):
+            raise Exception("Invalid Config format for ASpotifyDB")
+
+        config = config['db']
+
+        engine = create_engine(
+            f'postgresql://{config["POSTGRES_NAME"]}:{config["POSTGRES_PASS"]}@{config["POSTGRES_SERVER"]}:{config["POSTGRES_PORT"]}/{config["POSTGRES_DB"]}')
+
         Base.metadata.bind = engine
         Base.metadata.create_all(engine)
         self.session = sessionmaker(bind=engine)()
@@ -71,6 +59,22 @@ class ASpotifyDB:
             self.session.rollback()
             logging.warning("Attempt to insert artist that already exists in the DB")
 
+    @staticmethod
+    def _convert_artist(db_artist: AlchemyArtist):
+        return Artist(name=db_artist.name,
+                      spotify_id=db_artist.spotify_id,
+                      followers=db_artist.followers,
+                      popularity=db_artist.popularity,
+                      genres=[])
+
+    def get_artists(self):
+        try:
+            for batch in self.session.query(AlchemyArtist).yield_per(1000):
+                yield self._convert_artist(batch)
+        except Exception as e:
+            logging.error("Can't fetch artist result", e)
+
+
     def get_num_artist(self):
         try:
             return self.session.query(AlchemyArtist).count()
@@ -83,7 +87,7 @@ class ASpotifyDB:
     def add_relation(self, artist_id, related_artist_id):
         try:
             new_connection = AlchemyConnections(artist_id=artist_id,
-                                            related_id=related_artist_id)
+                                                related_id=related_artist_id)
             self.session.add(new_connection)
             self.session.commit()
         except Exception as e:
@@ -99,6 +103,17 @@ class ASpotifyDB:
             self.session.commit()
         except Exception as e:
             self.session.rollback()
+
+    @staticmethod
+    def _convert_relation(relation: AlchemyConnections):
+        return relation.artist_id, relation.related_id
+
+    def get_relations(self):
+        try:
+            for batch in self.session.query(AlchemyConnections).yield_per(1000):
+                yield self._convert_relation(batch)
+        except Exception as e:
+            logging.error("Can't fetch connections result", e)
 
     def check_artist_exists(self, artist_id):
         found = 0

@@ -1,13 +1,14 @@
 import logging
 import time
+import yaml
 
 from db.alchemy_spotify_db import ASpotifyDB as SpotifyDB
 
 
 class Monitoring:
-    def __init__(self, interval: int = 10):
+    def __init__(self, config, interval: int = 10):
         # interval in sec
-        self.db = SpotifyDB()
+        self.db = SpotifyDB(config)
         self.interval = interval
 
         self.last_value = None
@@ -25,5 +26,9 @@ class Monitoring:
 
 
 if __name__ == "__main__":
-    monitor = Monitoring()
+    config = None
+    with open("C:\\Dev\\spotigraph\\config.yaml", "r") as f:
+        config = yaml.safe_load(f)
+
+    monitor = Monitoring(config)
     monitor.run()
