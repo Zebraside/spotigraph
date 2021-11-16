@@ -11,6 +11,7 @@ import time
 import click
 import yaml
 import asyncio
+from multiprocessing import Pool
 
 from common.artist import Artist
 from db.alchemy_spotify_db import ASpotifyDB as SpotifyDB
@@ -18,6 +19,11 @@ from db.alchemy_spotify_db import ASpotifyDB as SpotifyDB
 from utils.profile import profile
 
 logging.basicConfig(level=logging.ERROR)
+
+index=0
+
+DURABLE=True
+QUEUE_NAME=f"task_queue:{index}"
 
 
 class Performer:
@@ -52,10 +58,10 @@ class CrowlerWorker:
         connection = pika.BlockingConnection(
             pika.ConnectionParameters(host='localhost'))
         self.channel = connection.channel()
+        self.channel.basic_qos(prefetch_count=100)
+        self.channel.queue_declare(queue=QUEUE_NAME, durable=DURABLE)
 
-        self.channel.queue_declare(queue='task_queue', durable=True)
-
-        self.channel.basic_consume(queue='task_queue', on_message_callback=self.handle_artist)
+        self.channel.basic_consume(queue=QUEUE_NAME, on_message_callback=self.handle_artist, auto_ack=True)
 
         # Init Spotify api
         client_credentials_manager = SpotifyClientCredentials()
@@ -63,6 +69,8 @@ class CrowlerWorker:
 
         # Init database
         self.db = SpotifyDB(config)
+
+        self.pool = Pool(2)
 
     def _get_related_artists(self, artist_id) -> List[Artist]:
         result = None
@@ -105,7 +113,7 @@ class CrowlerWorker:
     def _push_artist(self, artist_id: str):
         self.channel.basic_publish(
             exchange='',
-            routing_key='task_queue',
+            routing_key=QUEUE_NAME,
             body=str.encode(artist_id),
             properties=pika.BasicProperties(
                 delivery_mode=2,  # make message persistent
@@ -141,16 +149,25 @@ class CrowlerWorker:
     @profile
     def push_new(self, new):
         for n in new:
+            if self._check_visited(n):
+                continue
+
             self._push_artist(n)
 
     def handle_artist(self, ch, method, properties, body):
         print("handle")
         artist_id = body.decode("utf-8")
+
+        if self._check_visited(artist_id):
+            print("already visited")
+            #ch.basic_ack()
+            return
+
         artist, related_artists = self.get_artist_info(artist_id)
         new = self.save_artist(artist, related_artists)
         self.push_new(new)
 
-        ch.basic_ack(delivery_tag=method.delivery_tag)
+        #ch.basic_ack()
 
     def start(self):
         self.channel.start_consuming()
@@ -161,17 +178,17 @@ def send_test_message(artist_id):
         pika.ConnectionParameters(host='localhost'))
     channel = connection.channel()
 
-    channel.queue_declare(queue='task_queue', durable=True)
+    queue = channel.queue_declare(queue=QUEUE_NAME, durable=DURABLE)
 
     message = artist_id
     channel.basic_publish(
         exchange='',
-        routing_key='task_queue',
+        routing_key=QUEUE_NAME,
         body=message,
         properties=pika.BasicProperties(
-            delivery_mode=2,  # make message persistent
+            #delivery_mode=0,  # make message persistent
         ))
-    print(" [x] Sent %r" % message)
+    print(" [x] Sent %r" % message, queue.method.message_count)
     connection.close()
 
 
@@ -181,18 +198,59 @@ def start_listening(config):
     consumer.start()
 
 
+def random_injection(config):
+    db = SpotifyDB(config)
+
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(host='localhost'))
+    channel = connection.channel()
+
+    queue = channel.queue_declare(queue=QUEUE_NAME, durable=DURABLE)
+
+    while True:
+        connections = db.get_relations()
+        artists = set()
+        related = set()
+        for conn in connections:
+            artists.add(conn[0])
+            related.add(conn[1])
+
+        count = 10
+        for r in related:
+            if count <= 0:
+                break
+            if r not in artists:
+                channel.basic_publish(
+                    exchange='',
+                    routing_key=QUEUE_NAME,
+                    body=r,
+                    properties=pika.BasicProperties(
+                        # delivery_mode=0,  # make message persistent
+                    ))
+
+        time.sleep(10)
+
+
+
 @click.command()
 @click.option('--num_workers', default=1, help='number of parallel workers')
 @click.option('--initial_artist_id', default="3jOstUTkEu2JkjvRdBA5Gu", help='artist spotify id to start search')
 def main(num_workers, initial_artist_id):
-    send_test_message(initial_artist_id)
+    start_artists=["126FigDBtqwS2YsOYMTPQe", "3LC8PXXgk7YtAIobtjSdNi", "4ghjRm4M2vChDfTUycx0Ce"]
+    send_test_message(start_artists[index])
     config = dict()
-    with open("C:\\Dev\\spotigraph\\config.yaml", "r") as f:
+    with open("C:\\Development\\spotigraph\\config.yaml", "r") as f:
         config = yaml.safe_load(f)
 
-    for i in range(num_workers):
-        new_thread = Thread(target=start_listening, args=(config, ))
-        new_thread.start()
+    new_thread = Thread(target=random_injection, args=(config,))
+    new_thread.start()
+
+    if num_workers > 1:
+        for i in range(num_workers):
+            new_thread = Thread(target=start_listening, args=(config, ))
+            new_thread.start()
+    else:
+        start_listening(config)
 
 
 if __name__ == "__main__":

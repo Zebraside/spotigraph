@@ -9,7 +9,7 @@ from graph.visualization import visualize_graph
 
 if __name__ == '__main__':
     config = None
-    with open("C:\\Dev\\spotigraph\\config.yaml", "r") as f:
+    with open("C:\\Development\\spotigraph\\config.yaml", "r") as f:
         config = yaml.safe_load(f)
     db = SpotifyDB(config)
 
@@ -17,4 +17,4 @@ if __name__ == '__main__':
     connections = db.get_relations()
 
     graph = InternalGraph(artists, connections)
-    visualize_graph(graph, "C:\\Dev\\spotigraph\\test.dot")
+    visualize_graph(graph, "C:\\Development\\spotigraph\\test.dot")
