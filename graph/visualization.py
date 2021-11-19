@@ -27,9 +27,8 @@ def _save_networkx(graph, path):
 
 
 @profile
-def visualize_graph(graph: InternalGraph, path: str):
-    _save_graphviz(graph, path)
-    _save_networkx(graph, path)
+def visualize_graph(graph: InternalGraph, out_folder: str):
+    graph.export(out_folder)
 
     # _test_render(graph, path)
     #
