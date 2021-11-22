@@ -208,6 +208,7 @@ def random_injection(config):
     queue = channel.queue_declare(queue=QUEUE_NAME, durable=DURABLE)
 
     while True:
+        logging.info("NEW INJECTION")
         connections = db.get_relations()
         artists = set()
         related = set()
@@ -231,6 +232,38 @@ def random_injection(config):
         time.sleep(10)
 
 
+def clean_queue(config):
+    db = SpotifyDB(config)
+    count = 0
+    err = False
+    connection = pika.BlockingConnection(
+        pika.ConnectionParameters(host='localhost'))
+    channel = connection.channel()
+
+    queue = channel.queue_declare(queue=QUEUE_NAME, durable=DURABLE)
+
+    channel.basic_qos(prefetch_count=100)
+
+
+    def clean(ch, method, properties, body):
+        print("clean")
+        artist_id = body.decode("utf-8")
+
+        if db.check_artist_exists(artist_id):
+            print("Duplicated artist removed")
+            return
+
+        channel.basic_publish(
+            exchange='',
+            routing_key=QUEUE_NAME,
+            body=body,
+            properties=pika.BasicProperties(
+                # delivery_mode=0,  # make message persistent
+            ))
+
+    channel.basic_consume(queue=QUEUE_NAME, on_message_callback=clean, auto_ack=True)
+    channel.start_consuming()
+
 
 @click.command()
 @click.option('--num_workers', default=1, help='number of parallel workers')
@@ -242,15 +275,22 @@ def main(num_workers, initial_artist_id):
     with open("C:\\Development\\spotigraph\\config.yaml", "r") as f:
         config = yaml.safe_load(f)
 
+    # clean_queue(config)
+
     new_thread = Thread(target=random_injection, args=(config,))
     new_thread.start()
 
-    if num_workers > 1:
-        for i in range(num_workers):
-            new_thread = Thread(target=start_listening, args=(config, ))
-            new_thread.start()
-    else:
-        start_listening(config)
+    while True:
+        print("start")
+        try:
+            if num_workers > 1:
+                for i in range(num_workers):
+                    new_thread = Thread(target=start_listening, args=(config, ))
+                    new_thread.start()
+            else:
+                start_listening(config)
+        except:
+            print("Error occured")
 
 
 if __name__ == "__main__":

@@ -23,6 +23,7 @@ class InternalGraph:
         for artist in artists:
             self.g.add_vertex(name=artist.spotify_id,
                               label=artist.name,
+                              size=artist.followers / 100000,
                               artist_name=artist.spotify_id,
                               followers=artist.followers,
                               popularity=artist.popularity)
@@ -61,29 +62,32 @@ class InternalGraph:
         self.gg.save("graph.dot", out_folder)
         #self.gg.render(os.path.join(out_folder, "graph.gv"), view=True, format='png', renderer='svg')
 
+        print(f"followers {min(self.g.vs['followers'])} {max(self.g.vs['followers'])}")
+        print(f"popularity {min(self.g.vs['popularity'])} {max(self.g.vs['popularity'])}")
 
-        igraph.drawing.plot(self.g,
-                            os.path.join(out_folder, "reingold.png"),
-                            bbox=(0, 0, 10000, 10000),
-                            layout=self.g.layout_fruchterman_reingold())
-
-        igraph.drawing.plot(self.g,
-                            os.path.join(out_folder, "circle.png"),
-                            bbox=(0, 0, 10000, 10000),
-                            layout=self.g.layout_circle())
-
-        igraph.drawing.plot(self.g,
-                            os.path.join(out_folder, "star.png"),
-                            bbox=(0, 0, 10000, 10000),
-                            layout=self.g.layout_star())
-
-        igraph.drawing.plot(self.g,
-                            os.path.join(out_folder, "auto.png"),
-                            bbox=(0, 0, 10000, 10000),
-                            layout=self.g.layout_auto())
-
-        igraph.drawing.plot(self.g,
-                            os.path.join(out_folder, "grid.png"),
-                            bbox=(0, 0, 10000, 10000),
-                            layout=self.g.layout_grid())
+        for niter in tqdm.tqdm([100000000]):#tqdm.tqdm([500, 1000, 10000, 100000]):
+            igraph.drawing.plot(self.g,
+                                os.path.join(out_folder, f"reingold{niter}.png"),
+                                bbox=(0, 0, 32000, 32000),
+                                layout=self.g.layout_fruchterman_reingold(niter=niter))
+        #
+        # igraph.drawing.plot(self.g,
+        #                     os.path.join(out_folder, "circle.png"),
+        #                     bbox=(0, 0, 10000, 10000),
+        #                     layout=self.g.layout_circle())
+        #
+        # igraph.drawing.plot(self.g,
+        #                     os.path.join(out_folder, "star.png"),
+        #                     bbox=(0, 0, 10000, 10000),
+        #                     layout=self.g.layout_star())
+        #
+        # igraph.drawing.plot(self.g,
+        #                     os.path.join(out_folder, "auto.png"),
+        #                     bbox=(0, 0, 10000, 10000),
+        #                     layout=self.g.layout_auto())
+        #
+        # igraph.drawing.plot(self.g,
+        #                     os.path.join(out_folder, "grid.png"),
+        #                     bbox=(0, 0, 10000, 10000),
+        #                     layout=self.g.layout_grid())
 
