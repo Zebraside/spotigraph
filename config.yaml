@@ -6,5 +6,7 @@ db:
   POSTGRES_DB: postgres
 
 message_queue:
+  SCRAPPER_QUEUE_NAME: scrapper
+  ARTISTS_QUEUE_NAME: artists
   URL_QUEUE: url_queue
   DATA_QUEUE: data_queue

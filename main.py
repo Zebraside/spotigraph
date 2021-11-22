@@ -17,4 +17,4 @@ if __name__ == '__main__':
     connections = db.get_relations()
 
     graph = InternalGraph(artists, connections)
-    visualize_graph(graph, "C:\\Development\\spotigraph")
+    visualize_graph(graph, "data")

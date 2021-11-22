@@ -15,11 +15,6 @@ class Monitoring:
         self.last_value = None
 
     def ping(self):
-        connection = pika.BlockingConnection(
-            pika.ConnectionParameters(host='localhost'))
-        channel = connection.channel()
-        print(channel.queue_declare(queue='task_queue', durable=True).method.message_count)
-
         new_value = self.db.get_num_artist()
         print(f"Current number of artists is {new_value}. Delta is {new_value - self.last_value}")
         self.last_value = new_value
@@ -33,7 +28,7 @@ class Monitoring:
 
 if __name__ == "__main__":
     config = None
-    with open("C:\\Development\\spotigraph\\config.yaml", "r") as f:
+    with open("config.yaml", "r") as f:
         config = yaml.safe_load(f)
 
     monitor = Monitoring(config)
