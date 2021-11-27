@@ -49,7 +49,6 @@ class ArtistSaver:
 
         artist = ast.literal_eval(body)
 
-
         related_ids = artist.pop("related_ids")
         artist = Artist(**artist)
 
