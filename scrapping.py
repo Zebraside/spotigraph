@@ -2,11 +2,14 @@ import yaml
 import click
 
 from scrapper.scrapper import SpotifyScrapper
+from scrapper.queues import ScraperPublisher
 
 
 @click.command()
 @click.option('--initial_artist_id', default="3jOstUTkEu2JkjvRdBA5Gu", help='artist spotify id to start search')
 def main(initial_artist_id):
+    publisher = ScraperPublisher()
+    publisher.push(initial_artist_id)
     scrapper = SpotifyScrapper(initial_artist=initial_artist_id)
     scrapper.start()
 

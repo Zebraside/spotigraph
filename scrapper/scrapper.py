@@ -5,7 +5,7 @@ import logging
 from spotipy.oauth2 import SpotifyClientCredentials
 import spotipy
 
-from scrapper.queues import ArtistQueue, ScrapperQueue
+from scrapper.queues import ArtistPublisher, ScraperConsumer
 from db.alchemy_spotify_db import ASpotifyDB as SpotifyDB
 from common.artist import Artist
 
@@ -15,8 +15,8 @@ from utils.profile import Performer, profile
 class SpotifyScrapper:
     def __init__(self, initial_artist: str = None):
         # init message queues
-        self.scrapper_queue = ScrapperQueue(self._handle_artist)
-        self.artists_queue = ArtistQueue()
+        self.scrapper_queue = ScraperConsumer(self._handle_artist)
+        self.artists_queue = ArtistPublisher()
 
         # Init Spotify api
         client_credentials_manager = SpotifyClientCredentials()
@@ -24,9 +24,6 @@ class SpotifyScrapper:
 
         # Init database
         self.db = SpotifyDB()
-
-        if initial_artist:
-            self._push_new_artists([initial_artist])
 
     @staticmethod
     def _parse_artist(artist_result):
@@ -68,9 +65,6 @@ class SpotifyScrapper:
         artist_id = body.decode("utf-8")
         logging.debug(f"New artist {artist_id}")
 
-        # if self.db.check_artist_exists(artist_id):
-        #     return
-
         artist = self._get_artist(artist_id)
         related = self._get_related_artists(artist_id)
         if not artist:
@@ -79,9 +73,6 @@ class SpotifyScrapper:
 
         related_ids = [r.spotify_id for r in related]
         self._save_artist(artist, related_ids)
-
-        # new_related_ids = [new_id for new_id in related_ids]
-        # self._push_new_artists(new_related_ids)
 
     @profile
     def _push_new_artists(self, artist_ids):
@@ -95,4 +86,5 @@ class SpotifyScrapper:
         self.artists_queue.push(str(new_artist))
 
     def start(self):
+        print("Scraping started")
         self.scrapper_queue.start_consuming()

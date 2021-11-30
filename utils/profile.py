@@ -35,7 +35,7 @@ def profile(function, mark_start=False):
         t1 = time.time()
         result = function(*args, **kwargs)
         t2 = time.time()
-        print(f"{function.__name__} execution time is {t2 - t1}")
+        # print(f"{function.__name__} execution time is {t2 - t1}")
         return result
 
     return wrapper
