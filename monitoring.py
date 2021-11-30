@@ -7,9 +7,9 @@ from db.alchemy_spotify_db import ASpotifyDB as SpotifyDB
 
 
 class Monitoring:
-    def __init__(self, config, interval: int = 10):
+    def __init__(self, interval: int = 10):
         # interval in sec
-        self.db = SpotifyDB(config)
+        self.db = SpotifyDB()
         self.interval = interval
 
         self.last_value = None
@@ -27,9 +27,5 @@ class Monitoring:
 
 
 if __name__ == "__main__":
-    config = None
-    with open("config.yaml", "r") as f:
-        config = yaml.safe_load(f)
-
-    monitor = Monitoring(config)
+    monitor = Monitoring()
     monitor.run()

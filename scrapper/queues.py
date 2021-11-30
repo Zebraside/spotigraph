@@ -1,7 +1,9 @@
 import pika
 
+from config import MQ
 
-class Queue:
+
+class QueueBase:
     durable = True
 
     def __init__(self, queue_name, consume_handler=None):
@@ -37,3 +39,13 @@ class Queue:
             properties=pika.BasicProperties(
                 delivery_mode=2,  # make message persistent
             ))
+
+
+class ScrapperQueue(QueueBase):
+    def __init__(self, handler=None):
+        super(ScrapperQueue, self).__init__(MQ.SCRAPPER_QUEUE_NAME, handler)
+
+
+class ArtistQueue(QueueBase):
+    def __init__(self, handler=None):
+        super(ArtistQueue, self).__init__(MQ.ARTISTS_QUEUE_NAME, handler)

@@ -2,7 +2,7 @@ import ast
 
 import json
 
-from scrapper.queues import Queue
+from scrapper.queues import ArtistQueue, ScrapperQueue
 from db.alchemy_spotify_db import ASpotifyDB as SpotifyDB
 from common.artist import Artist
 
@@ -10,27 +10,12 @@ from utils.profile import profile
 
 
 class ArtistSaver:
-    @staticmethod
-    def _is_config_valid(config):
-        if "message_queue" not in config:
-            return False
-
-        config = config["message_queue"]
-        if "ARTISTS_QUEUE_NAME" not in config or \
-           "SCRAPPER_QUEUE_NAME" not in config:
-            return False
-
-        return True
-
-    def __init__(self, config):
-        if not self._is_config_valid(config):
-            raise Exception("config is not valid for ArtistSaver")
-
-        self.artists_queue = Queue(config["message_queue"]["ARTISTS_QUEUE_NAME"], self._handle_artist)
-        self.scrapper_queue = Queue(config["message_queue"]["SCRAPPER_QUEUE_NAME"])
+    def __init__(self):
+        self.artists_queue = ArtistQueue(self._handle_artist)
+        self.scrapper_queue = ScrapperQueue()
 
         # Init database
-        self.db = SpotifyDB(config)
+        self.db = SpotifyDB()
 
     def _save_artist(self, artist: Artist):
         artist_id = artist.spotify_id
@@ -57,6 +42,7 @@ class ArtistSaver:
 
         new_ids = [new_id for new_id in related_ids if not self.db.check_artist_exists(new_id)]
 
+        print("Pushing new", len(new_ids))
         for new_id in new_ids:
             self.scrapper_queue.push(new_id)
 

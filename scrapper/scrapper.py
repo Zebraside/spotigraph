@@ -5,7 +5,7 @@ import logging
 from spotipy.oauth2 import SpotifyClientCredentials
 import spotipy
 
-from scrapper.queues import Queue
+from scrapper.queues import ArtistQueue, ScrapperQueue
 from db.alchemy_spotify_db import ASpotifyDB as SpotifyDB
 from common.artist import Artist
 
@@ -13,31 +13,17 @@ from utils.profile import Performer, profile
 
 
 class SpotifyScrapper:
-    @staticmethod
-    def _validate_config(config):
-        if "message_queue"not in config:
-            return False
-
-        config = config["message_queue"]
-        if "SCRAPPER_QUEUE_NAME" not in config or "ARTISTS_QUEUE_NAME" not in config:
-            return False
-
-        return True
-
-    def __init__(self, config, initial_artist: str = None):
-        if not self._validate_config(config):
-            raise Exception("config is not valid for SpotifyScrapper")
-
+    def __init__(self, initial_artist: str = None):
         # init message queues
-        self.scrapper_queue = Queue(config["message_queue"]["SCRAPPER_QUEUE_NAME"], self._handle_artist)
-        self.artists_queue = Queue(config["message_queue"]["ARTISTS_QUEUE_NAME"])
+        self.scrapper_queue = ScrapperQueue(self._handle_artist)
+        self.artists_queue = ArtistQueue()
 
         # Init Spotify api
         client_credentials_manager = SpotifyClientCredentials()
         self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
 
         # Init database
-        self.db = SpotifyDB(config)
+        self.db = SpotifyDB()
 
         if initial_artist:
             self._push_new_artists([initial_artist])
@@ -52,20 +38,17 @@ class SpotifyScrapper:
 
     @profile
     def _get_related_artists(self, artist_id) -> List[Artist]:
-        result = None
         try:
             req = Performer("get related requrest")
             result = self.spotify.artist_related_artists(f'spotify:artist:{artist_id}')
             req.elapsed()
         except spotipy.exceptions.SpotifyException as e:
             logging.error(f"Can't get related artists: artist_id {artist_id}")
+            return []
 
-        if result:
-            # TODO: only return related ids
-            artists = [self._parse_artist(artist) for artist in result["artists"]]
-            return [artist for artist in artists if artist is not None]
-
-        return []
+        # TODO: only return related ids
+        artists = [self._parse_artist(artist) for artist in result["artists"]]
+        return [artist for artist in artists if artist is not None]
 
     @profile
     def _get_artist(self, artist_id: str):
@@ -105,6 +88,7 @@ class SpotifyScrapper:
         for new_id in artist_ids:
             self.scrapper_queue.push(new_id)
 
+    @profile
     def _save_artist(self, artist: Artist, related: List[str]):
         new_artist = dataclasses.asdict(artist)
         new_artist["related_ids"] = related

@@ -30,7 +30,7 @@ QUEUE_NAME=f"task_queue:{index}"
 
 
 class CrowlerWorker:
-    def __init__(self, config):
+    def __init__(self):
         # Init RabbitMQ
         connection = pika.BlockingConnection(
             pika.ConnectionParameters(host='localhost'))
@@ -45,7 +45,7 @@ class CrowlerWorker:
         self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
 
         # Init database
-        self.db = SpotifyDB(config)
+        self.db = SpotifyDB()
 
         self.pool = Pool(2)
 
@@ -169,9 +169,9 @@ def send_test_message(artist_id):
     connection.close()
 
 
-def start_listening(config):
+def start_listening():
 
-    consumer = CrowlerWorker(config)
+    consumer = CrowlerWorker()
     consumer.start()
 
 
@@ -265,7 +265,7 @@ def main(num_workers, initial_artist_id):
                     new_thread = Thread(target=start_listening, args=(config, ))
                     new_thread.start()
             else:
-                start_listening(config)
+                start_listening()
         except:
             print("Error occured")
 

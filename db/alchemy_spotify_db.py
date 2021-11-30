@@ -13,28 +13,13 @@ import logging
 from utils.profile import profile
 
 from common.artist import Artist
+from config import DB
 
 
 class ASpotifyDB:
-    @staticmethod
-    def _check_config(config):
-        config = config["db"]
-        if "POSTGRES_NAME" not in config or \
-           "POSTGRES_PASS" not in config or \
-           "POSTGRES_SERVER" not in config or \
-           "POSTGRES_PORT" not in config or \
-           "POSTGRES_DB" not in config:
-            return False
-        return True
-
-    def __init__(self, config):
-        if not self._check_config(config):
-            raise Exception("Invalid Config format for ASpotifyDB")
-
-        config = config['db']
-
+    def __init__(self):
         engine = create_engine(
-            f'postgresql://{config["POSTGRES_NAME"]}:{config["POSTGRES_PASS"]}@{config["POSTGRES_SERVER"]}:{config["POSTGRES_PORT"]}/{config["POSTGRES_DB"]}')
+            f'postgresql://{DB.POSTGRES_NAME}:{DB.POSTGRES_PASS}@{DB.POSTGRES_SERVER}:{DB.POSTGRES_PORT}/{DB.POSTGRES_DB}')
 
         Base.metadata.bind = engine
         Base.metadata.create_all(engine)

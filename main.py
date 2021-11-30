@@ -8,10 +8,7 @@ from graph.visualization import visualize_graph
 
 
 if __name__ == '__main__':
-    config = None
-    with open("config.yaml", "r") as f:
-        config = yaml.safe_load(f)
-    db = SpotifyDB(config)
+    db = SpotifyDB()
 
     artists = db.get_artists()
     connections = db.get_relations()
