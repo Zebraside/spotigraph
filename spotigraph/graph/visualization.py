@@ -1,8 +1,7 @@
-import graphviz
 import networkx as _nx
 
-from graph.artist_graph import InternalGraph
-from utils.profile import profile
+from spotigraph.graph.artist_graph import InternalGraph
+from spotigraph.utils.profile import profile
 
 
 @profile

@@ -1,6 +1,4 @@
-import yaml
-
-from scrapper.saver import ArtistSaver
+from spotigraph.scrapper import ArtistSaver
 
 
 def main():

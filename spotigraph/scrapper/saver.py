@@ -1,19 +1,18 @@
 import time
 import ast
 
-import json
+from spotigraph.scrapper.queues import ArtistConsumer, ScraperPublisher, MetricsPublisher
+from spotigraph.db.alchemy_spotify_db import ASpotifyDB as SpotifyDB
+from spotigraph.common.artist import Artist
 
-from scrapper.queues import ArtistConsumer, ScraperPublisher
-from db.alchemy_spotify_db import ASpotifyDB as SpotifyDB
-from common.artist import Artist
-
-from utils.profile import profile
+from spotigraph.utils.profile import profile
 
 
 class ArtistSaver:
     def __init__(self):
         self.artists_queue = ArtistConsumer(self._handle_artist)
         self.scrapper_queue = ScraperPublisher()
+        self.save_queue = MetricsPublisher("save")
 
         # Init database
         self.db = SpotifyDB()
@@ -28,12 +27,13 @@ class ArtistSaver:
             return
 
         self.db.add_artist(artist)
+        self.save_queue.push(str(time.time()))
 
     def _save_related(self, artist_id, related_ids):
         self.db.add_relations(artist_id, related_ids)
 
     @profile
-    def _handle_artist(self, ch, method, properties, body):
+    def _handle_artist(self, body):
         if self.time is None:
             self.time = time.time()
 

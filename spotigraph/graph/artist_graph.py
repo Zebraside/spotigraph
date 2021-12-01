@@ -1,13 +1,10 @@
 import os
 from typing import Iterable
-import networkx as _nx
 import graphviz
-from common.artist import Artist
-from utils.profile import profile
+from spotigraph.common.artist import Artist
+from spotigraph.utils.profile import profile
 import igraph
 import tqdm
-from multiprocessing import Pool
-
 
 
 class InternalGraph:

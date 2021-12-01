@@ -1,4 +1,4 @@
-from scrapper.injection import Injector
+from spotigraph.scrapper import Injector
 
 if __name__ == "__main__":
     injector = Injector()

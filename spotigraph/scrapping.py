@@ -1,8 +1,7 @@
-import yaml
 import click
 
-from scrapper.scrapper import SpotifyScrapper
-from scrapper.queues import ScraperPublisher
+from spotigraph.scrapper.scrapper import SpotifyScrapper
+from spotigraph.scrapper.queues import ScraperPublisher
 
 
 @click.command()

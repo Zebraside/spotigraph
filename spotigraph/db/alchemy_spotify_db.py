@@ -1,7 +1,4 @@
-import os
-import sys
-from sqlalchemy.orm import relationship
-from db.schema import AlchemyArtistGenre, AlchemyArtist, AlchemyConnections, Base
+from spotigraph.db.schema import AlchemyArtistGenre, AlchemyArtist, AlchemyConnections, Base
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.exc import IntegrityError, PendingRollbackError
@@ -10,10 +7,10 @@ from typing import List
 import sqlite3
 import logging
 
-from utils.profile import profile
+from spotigraph.utils.profile import profile
 
-from common.artist import Artist
-from config import DB
+from spotigraph.common.artist import Artist
+from spotigraph.config import DB
 
 
 class ASpotifyDB:

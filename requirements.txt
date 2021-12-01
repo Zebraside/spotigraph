@@ -7,3 +7,4 @@ PyYAML==6.0
 spotipy==2.19.0
 SQLAlchemy==1.4.27
 tqdm==4.62.3
+psycopg2

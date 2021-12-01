@@ -1,10 +1,7 @@
-import sqlite3
-import click
-import yaml
-from db.alchemy_spotify_db import ASpotifyDB as SpotifyDB
+from spotigraph.db import ASpotifyDB as SpotifyDB
 
-from graph.artist_graph import InternalGraph
-from graph.visualization import visualize_graph
+from spotigraph.graph.artist_graph import InternalGraph
+from spotigraph.graph import visualize_graph
 
 
 if __name__ == '__main__':
