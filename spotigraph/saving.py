@@ -1,4 +1,4 @@
-from spotigraph.scrapper import ArtistSaver
+from spotigraph.scrapper.saver import ArtistSaver
 
 
 def main():
